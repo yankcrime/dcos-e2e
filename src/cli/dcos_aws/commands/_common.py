@@ -3,6 +3,7 @@ Common code for dcos-aws CLI modules.
 """
 
 from pathlib import Path
+from shutil import rmtree
 from typing import Dict, Set
 
 import boto3
@@ -222,3 +223,11 @@ class ClusterInstances:
             agents=set(map(self.to_node, self.agents)),
             public_agents=set(map(self.to_node, self.public_agents)),
         )
+
+    def destroy(self) -> None:
+        """
+        Destroy this cluster.
+        """
+        workspace_dir = self.workspace_dir
+        # TODO destroy instances, and key pair, and?
+        rmtree(path=str(workspace_dir), ignore_errors=True)
