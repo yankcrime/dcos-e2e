@@ -67,14 +67,16 @@ class TestDcosAWS:
               --help     Show this message and exit.
 
             Commands:
-              create   Create a DC/OS cluster.
-              doctor   Diagnose common issues which stop DC/OS E2E...
-              inspect  Show cluster details.
-              list     List all clusters.
-              run      Run an arbitrary command on a node.
-              sync     Sync files from a DC/OS checkout to master...
-              wait     Wait for DC/OS to start.
-              web      Open the browser at the web UI.
+              create        Create a DC/OS cluster.
+              destroy       Destroy a cluster.
+              destroy-list  Destroy clusters.
+              doctor        Diagnose common issues which stop DC/OS E2E...
+              inspect       Show cluster details.
+              list          List all clusters.
+              run           Run an arbitrary command on a node.
+              sync          Sync files from a DC/OS checkout to master...
+              wait          Wait for DC/OS to start.
+              web           Open the browser at the web UI.
             """,# noqa: E501,E261
         )
         # yapf: enable
@@ -461,6 +463,77 @@ class TestInspect:
               -c, --cluster-id TEXT  The ID of the cluster to use.  [default: default]
               --aws-region TEXT      The AWS region to use.  [default: us-west-2]
               --help                 Show this message and exit.
+            """,# noqa: E501,E261
+        )
+        # yapf: enable
+        assert result.output == expected_help
+
+
+class TestDestroy:
+    """
+    Tests for the `destroy` subcommand.
+    """
+
+    def test_help(self) -> None:
+        """
+        Help text is shown with `dcos-aws destroy --help`.
+        """
+        runner = CliRunner()
+        result = runner.invoke(
+            dcos_aws,
+            ['destroy', '--help'],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 0
+        # yapf breaks multi-line noqa, see
+        # https://github.com/google/yapf/issues/524.
+        # yapf: disable
+        expected_help = dedent(
+            """\
+            Usage: dcos-aws destroy [OPTIONS]
+
+              Destroy a cluster.
+
+            Options:
+              -c, --cluster-id TEXT  The ID of the cluster to use.  [default: default]
+              --aws-region TEXT      The AWS region to use.  [default: us-west-2]
+              --help                 Show this message and exit.
+            """,# noqa: E501,E261
+        )
+        # yapf: enable
+        assert result.output == expected_help
+
+
+class TestDestroyList:
+    """
+    Tests for the `destroy-list` subcommand.
+    """
+
+    def test_help(self) -> None:
+        """
+        Help text is shown with `dcos-aws destroy --help`.
+        """
+        runner = CliRunner()
+        result = runner.invoke(
+            dcos_aws,
+            ['destroy-list', '--help'],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 0
+        # yapf breaks multi-line noqa, see
+        # https://github.com/google/yapf/issues/524.
+        # yapf: disable
+        expected_help = dedent(
+            """\
+            Usage: dcos-aws destroy-list [OPTIONS] [CLUSTER_IDS]...
+
+              Destroy clusters.
+
+              To destroy all clusters, run ``dcos-vagrant destroy $(dcos-vagrant list)``.
+
+            Options:
+              --aws-region TEXT  The AWS region to use.  [default: us-west-2]
+              --help             Show this message and exit.
             """,# noqa: E501,E261
         )
         # yapf: enable
