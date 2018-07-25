@@ -37,3 +37,11 @@ CLI Reference
 
 .. click:: cli.dcos_aws:web
   :prog: dcos-aws web
+
+.. click:: cli.dcos_vagrant:destroy
+  :prog: dcos-vagrant destroy
+
+.. _dcos-vagrant-destroy-list:
+
+.. click:: cli.dcos_vagrant:destroy_list
+  :prog: dcos-vagrant destroy-list
