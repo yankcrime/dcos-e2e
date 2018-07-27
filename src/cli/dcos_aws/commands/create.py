@@ -36,6 +36,7 @@ from dcos_e2e.cluster import Cluster
 from dcos_e2e.distributions import Distribution
 
 from ._common import (
+    CLOUDFORMATION_STACK_NAME_TAG_KEY,
     CLUSTER_ID_TAG_KEY,
     KEY_NAME_TAG_KEY,
     NODE_TYPE_AGENT_TAG_VALUE,
@@ -149,10 +150,14 @@ def create(
 
     doctor_message = 'Try `dcos-aws doctor` for troubleshooting help.'
     enterprise = bool(variant == 'enterprise')
+    aws_cloudformation_stack_name = 'dcos-e2e-{random}'.format(
+        random=str(uuid.uuid4()),
+    )
     cluster_backend = AWS(
         aws_key_pair=(key_name, private_key_path),
         workspace_dir=workspace_dir,
         aws_region=aws_region,
+        aws_cloudformation_stack_name=aws_cloudformation_stack_name,
     )
     ssh_user = {
         Distribution.CENTOS_7: 'centos',
@@ -216,6 +221,11 @@ def create(
         'Value': 'ee' if enterprise else '',
     }
 
+    cloudformation_stack_name_tag = {
+        'Key': CLOUDFORMATION_STACK_NAME_TAG_KEY,
+        'Value': aws_cloudformation_stack_name,
+    }
+
     for nodes, tag_value in (
         (cluster.masters, NODE_TYPE_MASTER_TAG_VALUE),
         (cluster.agents, NODE_TYPE_AGENT_TAG_VALUE),
@@ -237,6 +247,7 @@ def create(
         ec2.create_tags(
             Resources=instance_ids,
             Tags=[
+                cloudformation_stack_name_tag,
                 cluster_id_tag,
                 key_name_tag,
                 role_tag,

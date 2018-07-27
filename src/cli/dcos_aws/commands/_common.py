@@ -21,6 +21,7 @@ NODE_TYPE_PUBLIC_AGENT_TAG_VALUE = 'public_agent'
 SSH_USER_TAG_KEY = 'dcos_e2e.ssh_user'
 VARIANT_TAG_KEY = 'dcos_e2e.variant'
 WORKSPACE_DIR_TAG_KEY = 'dcos_e2e.workspace_dir'
+CLOUDFORMATION_STACK_NAME_TAG_KEY = 'dcos_e2e.cloudformation_stack_name'
 
 
 def _tag_dict(instance: ServiceResource) -> Dict[str, str]:
