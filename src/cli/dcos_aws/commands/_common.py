@@ -233,5 +233,7 @@ class ClusterInstances:
         instance = next(iter(self.masters))
         tag_dict = _tag_dict(instance=instance)
         stack_name = tag_dict[CLOUDFORMATION_STACK_NAME_TAG_KEY]
+        key_name = tag_dict[KEY_NAME_TAG_KEY]
         # TODO destroy instances, and key pair, and?
         rmtree(path=str(workspace_dir), ignore_errors=True)
+        ec2.delete_key_pair(KeyName=key_name)
