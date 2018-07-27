@@ -1,5 +1,7 @@
 """
 Tests for managing DC/OS cluster nodes.
+
+See ``test_node_install.py`` for more, related tests.
 """
 
 import logging
@@ -19,8 +21,7 @@ from py.path import local  # pylint: disable=no-name-in-module, import-error
 
 from dcos_e2e.backends import Docker
 from dcos_e2e.cluster import Cluster
-from dcos_e2e.docker_versions import DockerVersion
-from dcos_e2e.node import Node, Role, Transport
+from dcos_e2e.node import Node, Transport
 
 # We ignore this error because it conflicts with `pytest` standard usage.
 # pylint: disable=redefined-outer-name
@@ -179,7 +180,7 @@ class TestSendFile:
         master_destination_dir = Path(master_base_dir)
 
         dcos_node.send_file(
-            local_path=Path(local_file_path),
+            local_path=Path(str(local_file_path)),
             remote_path=master_destination_dir / dir_name / file_name,
         )
 
@@ -191,7 +192,7 @@ class TestSendFile:
         local_file_path.write(new_content)
 
         dcos_node.send_file(
-            local_path=Path(dir_path),
+            local_path=Path(str(dir_path)),
             remote_path=master_destination_dir,
         )
         args = ['cat', str(master_destination_dir / dir_name / file_name)]
@@ -719,53 +720,3 @@ class TestRun:
 
         expected_message = '`log_output_live` and `tty` cannot both be `True`.'
         assert str(excinfo.value) == expected_message
-
-
-class TestAdvancedInstallationMethod:
-    """
-    Test installing DC/OS on a node.
-    """
-
-    def test_install_dcos_from_url(self, oss_artifact_url: str) -> None:
-        """
-        It is possible to install DC/OS on a node from a URL.
-        """
-        # We use a specific version of Docker on the nodes because else we may
-        # hit https://github.com/opencontainers/runc/issues/1175.
-        cluster_backend = Docker(docker_version=DockerVersion.v17_12_1_ce)
-        with Cluster(cluster_backend=cluster_backend) as cluster:
-            for nodes, role in (
-                (cluster.masters, Role.MASTER),
-                (cluster.agents, Role.AGENT),
-                (cluster.public_agents, Role.PUBLIC_AGENT),
-            ):
-                for node in nodes:
-                    node.install_dcos_from_url(
-                        build_artifact=oss_artifact_url,
-                        dcos_config=cluster.base_config,
-                        ip_detect_path=cluster_backend.ip_detect_path,
-                        role=role,
-                    )
-            cluster.wait_for_dcos_oss()
-
-    def test_install_dcos_from_path(self, oss_artifact: Path) -> None:
-        """
-        It is possible to install DC/OS on a node from a path.
-        """
-        # We use a specific version of Docker on the nodes because else we may
-        # hit https://github.com/opencontainers/runc/issues/1175.
-        cluster_backend = Docker(docker_version=DockerVersion.v17_12_1_ce)
-        with Cluster(cluster_backend=cluster_backend) as cluster:
-            for nodes, role in (
-                (cluster.masters, Role.MASTER),
-                (cluster.agents, Role.AGENT),
-                (cluster.public_agents, Role.PUBLIC_AGENT),
-            ):
-                for node in nodes:
-                    node.install_dcos_from_path(
-                        build_artifact=oss_artifact,
-                        dcos_config=cluster.base_config,
-                        ip_detect_path=cluster_backend.ip_detect_path,
-                        role=role,
-                    )
-            cluster.wait_for_dcos_oss()
