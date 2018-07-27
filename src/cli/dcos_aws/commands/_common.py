@@ -230,6 +230,7 @@ class ClusterInstances:
         Destroy this cluster.
         """
         workspace_dir = self.workspace_dir
+        ec2 = boto3.client('ec2', region_name=self._aws_region)
         instance = next(iter(self.masters))
         tag_dict = _tag_dict(instance=instance)
         stack_name = tag_dict[CLOUDFORMATION_STACK_NAME_TAG_KEY]
