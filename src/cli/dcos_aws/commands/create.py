@@ -18,7 +18,9 @@ from cli.common.options import (
     agents_option,
     cluster_id_option,
     copy_to_master_option,
+    enable_selinux_enforcing_option,
     extra_config_option,
+    genconf_dir_option,
     license_key_option,
     masters_option,
     public_agents_option,
@@ -39,6 +41,7 @@ from ._common import (
     CLOUDFORMATION_STACK_NAME_TAG_KEY,
     CLUSTER_ID_TAG_KEY,
     KEY_NAME_TAG_KEY,
+    LINUX_DISTRIBUTIONS,
     NODE_TYPE_AGENT_TAG_VALUE,
     NODE_TYPE_MASTER_TAG_VALUE,
     NODE_TYPE_PUBLIC_AGENT_TAG_VALUE,
@@ -48,7 +51,7 @@ from ._common import (
     WORKSPACE_DIR_TAG_KEY,
     existing_cluster_ids,
 )
-from ._options import aws_region_option
+from ._options import aws_region_option, linux_distribution_option
 
 
 @click.command('create')
@@ -71,12 +74,15 @@ from ._options import aws_region_option
 @extra_config_option
 @public_agents_option
 @aws_region_option
+@linux_distribution_option
 @workspace_dir_option
 @license_key_option
+@genconf_dir_option
 @security_mode_option
 @copy_to_master_option
 @verbosity_option
 @cluster_id_option
+@enable_selinux_enforcing_option
 def create(
     agents: int,
     artifact_url: str,
@@ -90,7 +96,10 @@ def create(
     copy_to_master: List[Tuple[Path, Path]],
     verbose: int,
     aws_region: str,
+    linux_distribution: str,
     cluster_id: str,
+    enable_selinux_enforcing: bool,
+    genconf_dir: Optional[Path],
 ) -> None:
     """
     Create a DC/OS cluster.
@@ -158,10 +167,12 @@ def create(
         workspace_dir=workspace_dir,
         aws_region=aws_region,
         aws_cloudformation_stack_name=aws_cloudformation_stack_name,
+        linux_distribution=LINUX_DISTRIBUTIONS[linux_distribution],
     )
     ssh_user = {
         Distribution.CENTOS_7: 'centos',
         Distribution.COREOS: 'core',
+        Distribution.UBUNTU_16_04: 'ubuntu',
     }
     default_user = ssh_user[cluster_backend.linux_distribution]
 
@@ -257,6 +268,11 @@ def create(
             ],
         )
 
+    nodes = {*cluster.masters, *cluster.agents, *cluster.public_agents}
+    for node in nodes:
+        if enable_selinux_enforcing:
+            node.run(args=['setenforce', '1'], sudo=True)
+
     for node in cluster.masters:
         for path_pair in copy_to_master:
             local_path, remote_path = path_pair
@@ -264,6 +280,14 @@ def create(
                 local_path=local_path,
                 remote_path=remote_path,
             )
+
+    files_to_copy_to_genconf_dir = []
+    if genconf_dir is not None:
+        container_genconf_path = Path('/genconf')
+        for genconf_file in genconf_dir.glob('*'):
+            genconf_relative = genconf_file.relative_to(genconf_dir)
+            relative_path = container_genconf_path / genconf_relative
+            files_to_copy_to_genconf_dir.append((genconf_file, relative_path))
 
     try:
         with click_spinner.spinner():
@@ -274,6 +298,7 @@ def create(
                     **extra_config,
                 },
                 ip_detect_path=cluster_backend.ip_detect_path,
+                files_to_copy_to_genconf_dir=files_to_copy_to_genconf_dir,
             )
     except CalledProcessError as exc:
         click.echo('Error installing DC/OS.', err=True)

@@ -19,7 +19,9 @@ from cli.common.options import (
     agents_option,
     cluster_id_option,
     copy_to_master_option,
+    enable_selinux_enforcing_option,
     extra_config_option,
+    genconf_dir_option,
     license_key_option,
     masters_option,
     public_agents_option,
@@ -49,18 +51,12 @@ from ._common import (
 @workspace_dir_option
 @variant_option
 @license_key_option
+@genconf_dir_option
 @security_mode_option
 @copy_to_master_option
 @cluster_id_option
 @verbosity_option
-@click.option(
-    '--enable-selinux-enforcing',
-    is_flag=True,
-    help=(
-        'With this flag set, SELinux is set to enforcing before DC/OS is '
-        'installed on the cluster.'
-    ),
-)
+@enable_selinux_enforcing_option
 def create(
     agents: int,
     artifact: str,
@@ -75,6 +71,7 @@ def create(
     cluster_id: str,
     verbose: int,
     enable_selinux_enforcing: bool,
+    genconf_dir: Optional[Path],
 ) -> None:
     """
     Create a DC/OS cluster.
@@ -180,6 +177,14 @@ def create(
                 remote_path=remote_path,
             )
 
+    files_to_copy_to_genconf_dir = []
+    if genconf_dir is not None:
+        container_genconf_path = Path('/genconf')
+        for genconf_file in genconf_dir.glob('*'):
+            genconf_relative = genconf_file.relative_to(genconf_dir)
+            relative_path = container_genconf_path / genconf_relative
+            files_to_copy_to_genconf_dir.append((genconf_file, relative_path))
+
     try:
         with click_spinner.spinner():
             cluster.install_dcos_from_path(
@@ -189,6 +194,7 @@ def create(
                     **extra_config,
                 },
                 ip_detect_path=cluster_backend.ip_detect_path,
+                files_to_copy_to_genconf_dir=files_to_copy_to_genconf_dir,
             )
     except CalledProcessError as exc:
         click.echo('Error installing DC/OS.', err=True)

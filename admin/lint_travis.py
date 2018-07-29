@@ -5,82 +5,109 @@ Every test pattern we run on CI must also be specified in
 This allows us to download only the required DC/OS artifacts.
 However, this is prone to error.
 
-This script attempts to help with that by telling test authors if they have
-missed adding an item to ``admin/run_script.py``.
+The tests here help show some errors early.
 """
 
-import os
-import sys
+import subprocess
 from pathlib import Path
-from typing import Set  # noqa: F401
+from typing import Dict  # noqa: F401
+from typing import Set
 
 import pytest
 import yaml
 
 from run_script import PATTERNS
 
-TRAVIS_FILE = Path(__file__).parent.parent / '.travis.yml'
-TRAVIS_CONTENTS = TRAVIS_FILE.read_text()
-TRAVIS_DICT = yaml.load(TRAVIS_CONTENTS)
-TRAVIS_MATRIX = TRAVIS_DICT['env']['matrix']
 
-CI_PATTERNS = set()  # type: Set[str]
-for MATRIX_ITEM in TRAVIS_MATRIX:
-    KEY, VALUE = MATRIX_ITEM.split('=')
-    assert KEY == 'CI_PATTERN'
-    if VALUE in CI_PATTERNS:
-        raise Exception(
-            '"{pattern}" is duplicated in ".travis.yml".'.format(
-                pattern=VALUE,
-            ),
+def _travis_ci_patterns() -> Set[str]:
+    """
+    Return the CI patterns given in the ``.travis.yml`` file.
+    """
+    travis_file = Path(__file__).parent.parent / '.travis.yml'
+    travis_contents = travis_file.read_text()
+    travis_dict = yaml.load(travis_contents)
+    travis_matrix = travis_dict['env']['matrix']
+
+    ci_patterns = set()  # type: Set[str]
+    for matrix_item in travis_matrix:
+        key, value = matrix_item.split('=')
+        assert key == 'CI_PATTERN'
+        assert value not in ci_patterns
+        # Special case for running no tests.
+        if value != "''":
+            ci_patterns.add(value)
+
+    return ci_patterns
+
+
+def _tests_from_pattern(ci_pattern: str) -> Set[str]:
+    """
+    From a CI pattern, get all tests ``pytest`` would collect.
+    """
+    tests = set([])  # type: Set[str]
+    args = ['pytest', '--collect-only', ci_pattern, '-q']
+    result = subprocess.run(args=args, stdout=subprocess.PIPE)
+    output = result.stdout
+    for line in output.splitlines():
+        if line and not line.startswith(b'no tests ran in'):
+            tests.add(line.decode())
+
+    return tests
+
+
+def test_ci_patterns_match() -> None:
+    """
+    The patterns in ``.travis.yml`` must match the patterns in
+    ``admin/run_script.py``.
+    """
+    ci_patterns = _travis_ci_patterns()
+    assert ci_patterns - PATTERNS.keys() == set()
+    assert PATTERNS.keys() - ci_patterns == set()
+
+
+def test_ci_patterns_valid() -> None:
+    """
+    All of the CI patterns in ``.travis.yml`` match at least one test in the
+    test suite.
+    """
+    ci_patterns = _travis_ci_patterns()
+
+    for ci_pattern in ci_patterns:
+        collect_only_result = pytest.main(['--collect-only', ci_pattern])
+
+        message = '"{ci_pattern}" does not match any tests.'.format(
+            ci_pattern=ci_pattern,
         )
-    # Special case for running no tests.
-    if VALUE != "''":
-        CI_PATTERNS.add(VALUE)
+        assert collect_only_result == 0, message
 
-if CI_PATTERNS != PATTERNS.keys():
-    sys.stderr.write(
-        'The test patterns in ``.travis.yml`` and ``admin/run_script.py`` '
-        'differ:\n',
-    )
 
-    TRAVIS_ONLY = CI_PATTERNS - PATTERNS.keys()
-    if TRAVIS_ONLY:
-        for TRAVIS_ONLY_ITEM in TRAVIS_ONLY:
-            sys.stderr.write(
-                '    Only ``.travis.yml`` includes "{item}".\n'.format(
-                    item=TRAVIS_ONLY_ITEM,
-                ),
-            )
+def test_tests_collected_once() -> None:
+    """
+    Each test in the test suite is collected exactly once.
 
-    RUN_SCRIPT_ONLY = PATTERNS.keys() - CI_PATTERNS
-    if RUN_SCRIPT_ONLY:
-        for RUN_SCRIPT_ONLY_ITEM in RUN_SCRIPT_ONLY:
-            sys.stderr.write(
-                '    Only ``admin/run_script.py`` includes "{item}."\n'.format(
-                    item=RUN_SCRIPT_ONLY_ITEM,
-                ),
-            )
+    This does not necessarily mean that they are run - they may be skipped.
+    """
+    ci_patterns = _travis_ci_patterns()
+    tests_to_patterns = {}  # type: Dict[str, Set[str]]
+    for pattern in ci_patterns:
+        tests = _tests_from_pattern(ci_pattern=pattern)
+        for test in tests:
+            if test in tests_to_patterns:
+                tests_to_patterns[test].add(pattern)
+            else:
+                tests_to_patterns[test] = set([pattern])
 
-COLLECT_ONLY_ERROR_RESULTS = set()
-for CI_PATTERN in CI_PATTERNS:
-    OLD_OUT = sys.stdout
-    OLD_ERR = sys.stderr
-    sys.stdout = open(os.devnull, 'w')
-    sys.stderr = open(os.devnull, 'w')
-    COLLECT_ONLY_RESULT = pytest.main(['--collect-only', CI_PATTERN])
-    sys.stdout = OLD_OUT
-    sys.stderr = OLD_ERR
+    for test_name, patterns in tests_to_patterns.items():
+        message = (
+            'Test "{test_name}" will be run once for each pattern in '
+            '{patterns}. '
+            'Each test should be run only once.'
+        ).format(
+            test_name=test_name,
+            patterns=patterns,
+        )
+        assert len(patterns) == 1, message
 
-    if COLLECT_ONLY_RESULT != 0:
-        COLLECT_ONLY_ERROR_RESULTS.add(CI_PATTERN)
-
-for ERROR_PATTERN in COLLECT_ONLY_ERROR_RESULTS:
-    sys.stderr.write(
-        'Error finding tests with pattern "{pattern}".\n'.format(
-            pattern=ERROR_PATTERN,
-        ),
-    )
-
-if CI_PATTERNS != PATTERNS.keys() or COLLECT_ONLY_ERROR_RESULTS:
-    sys.exit(1)
+    all_tests = _tests_from_pattern(ci_pattern='tests/')
+    assert tests_to_patterns.keys() - all_tests == set()
+    assert all_tests - tests_to_patterns.keys() == set()

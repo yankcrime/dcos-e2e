@@ -145,6 +145,9 @@ class TestCreate:
               --public-agents INTEGER         The number of public agent nodes.  [default:
                                               1]
               --aws-region TEXT               The AWS region to use.  [default: us-west-2]
+              --linux-distribution [centos-7]
+                                              The Linux distribution to use on the nodes.
+                                              [default: centos-7]
               --workspace-dir PATH            Creating a cluster can use approximately 2 GB
                                               of temporary storage. Set this option to use a
                                               custom "workspace" for this temporary storage.
@@ -156,6 +159,10 @@ class TestCreate:
                                               using DC/OS Enterprise, this defaults to the
                                               value of the `DCOS_LICENSE_KEY_PATH`
                                               environment variable.
+              --genconf-dir PATH              Path to a directory that contains additional
+                                              files for the DC/OS installer. All files from
+                                              this directory will be copied to the "genconf"
+                                              directory before running the DC/OS installer.
               --security-mode [disabled|permissive|strict]
                                               The security mode to use for a DC/OS
                                               Enterprise cluster. This overrides any
@@ -169,6 +176,9 @@ class TestCreate:
               -c, --cluster-id TEXT           A unique identifier for the cluster. Use the
                                               value "default" to use this cluster for other
                                               commands without specifying --cluster-id.
+              --enable-selinux-enforcing      With this flag set, SELinux is set to
+                                              enforcing before DC/OS is installed on the
+                                              cluster.
               --help                          Show this message and exit.
             """,# noqa: E501,E261
         )
@@ -232,7 +242,9 @@ class TestDoctor:
               Diagnose common issues which stop DC/OS E2E from working correctly.
 
             Options:
-              --help  Show this message and exit.
+              -v, --verbose  Use verbose output. Use this option multiple times for more
+                             verbose output.
+              --help         Show this message and exit.
             """,# noqa: E501,E261
         )
         # yapf: enable

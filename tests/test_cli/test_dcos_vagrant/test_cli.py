@@ -161,6 +161,10 @@ class TestCreate:
                                               using DC/OS Enterprise, this defaults to the
                                               value of the `DCOS_LICENSE_KEY_PATH`
                                               environment variable.
+              --genconf-dir PATH              Path to a directory that contains additional
+                                              files for the DC/OS installer. All files from
+                                              this directory will be copied to the "genconf"
+                                              directory before running the DC/OS installer.
               --security-mode [disabled|permissive|strict]
                                               The security mode to use for a DC/OS
                                               Enterprise cluster. This overrides any
@@ -279,7 +283,9 @@ class TestDoctor:
               Diagnose common issues which stop DC/OS E2E from working correctly.
 
             Options:
-              --help  Show this message and exit.
+              -v, --verbose  Use verbose output. Use this option multiple times for more
+                             verbose output.
+              --help         Show this message and exit.
             """,# noqa: E501,E261
         )
         # yapf: enable
