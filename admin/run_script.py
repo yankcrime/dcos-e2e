@@ -72,6 +72,18 @@ PATTERNS = {
     (),
     'tests/test_dcos_e2e/backends/aws/test_aws.py::TestDCOSInstallation::test_install_dcos_with_custom_genconf':  # noqa: E501
     (),
+    'tests/test_dcos_e2e/backends/aws/test_aws.py::TestDCOSInstallation::test_install_dcos_with_custom_ip_detect':  # noqa: E501
+    (),
+    'tests/test_dcos_e2e/backends/aws/test_distributions.py::TestCentos7::test_default_distribution':   # noqa: E501
+    (),
+    'tests/test_dcos_e2e/backends/aws/test_distributions.py::TestCentos7::test_set_distribution':   # noqa: E501
+    (),
+    'tests/test_dcos_e2e/backends/aws/test_distributions.py::TestRHEL7::test_oss':  # noqa: E501
+    (),
+    'tests/test_dcos_e2e/backends/aws/test_distributions.py::TestRHEL7::test_enterprise':  # noqa: E501
+    (),
+    'tests/test_dcos_e2e/backends/aws/test_aws.py::TestTags':  # noqa: E501
+    (),
     'tests/test_dcos_e2e/backends/docker/test_distributions.py::TestCentos7':
     (),
     'tests/test_dcos_e2e/backends/docker/test_distributions.py::TestCoreOS::test_enterprise':  # noqa: E501
@@ -143,6 +155,7 @@ def _download_file(url: str, path: Path) -> None:
     """
     label = 'Downloading to ' + str(path)
     stream = requests.get(url, stream=True)
+    assert stream.ok
     content_length = int(stream.headers['Content-Length'])
     total_written = 0
     chunk_size = 1024
@@ -166,7 +179,15 @@ def _download_file(url: str, path: Path) -> None:
                     total_written += len(chunk)
                     file_descriptor.write(chunk)  # type: ignore
 
-    assert total_written == content_length
+    message = (
+        'Downloaded {total_written} bytes. '
+        'Expected {content_length} bytes.'
+    ).format(
+        total_written=total_written,
+        content_length=content_length,
+    )
+
+    assert total_written == content_length, message
 
 
 def download_artifacts(test_pattern: str) -> None:

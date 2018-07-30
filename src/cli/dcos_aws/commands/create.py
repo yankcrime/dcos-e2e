@@ -7,7 +7,7 @@ import tempfile
 import uuid
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import boto3
 import click
@@ -54,10 +54,50 @@ from ._common import (
 from ._options import aws_region_option, linux_distribution_option
 
 
+def _validate_tags(
+    ctx: click.core.Context,
+    param: Union[click.core.Option, click.core.Parameter],
+    value: Any,
+) -> Dict[str, int]:
+    """
+    Turn tag strings into a Dict.
+    """
+    # We "use" variables to satisfy linting tools.
+    for _ in (ctx, param):
+        pass
+
+    tags = {}  # type: Dict[str, int]
+    for tag_definition in value:
+        parts = tag_definition.split(':')
+
+        if len(parts) != 2:
+            message = (
+                '"{tag_definition}" is not a valid tag. '
+                'Please follow this syntax: <TAG_KEY>:<TAG_VALUE>.'
+            ).format(tag_definition=tag_definition)
+            raise click.BadParameter(message=message)
+
+        tag_key, tag_value = parts
+        if tag_key in tags:
+            message = ('Tag key "{tag_key}" specified multiple times.'
+                       ).format(tag_key=tag_key)
+            raise click.BadParameter(message=message)
+
+        tags[tag_key] = tag_value
+    return tags
+
+
 @click.command('create')
 @click.argument(
     'artifact_url',
     type=str,
+)
+@click.option(
+    '--custom-tag',
+    type=str,
+    callback=_validate_tags,
+    help='Add tags to EC2 instances in the format "<TAG_KEY>:<TAG_VALUE>".',
+    multiple=True,
 )
 @click.option(
     '--variant',
@@ -100,6 +140,7 @@ def create(
     cluster_id: str,
     enable_selinux_enforcing: bool,
     genconf_dir: Optional[Path],
+    custom_tag: Dict[str, str],
 ) -> None:
     """
     Create a DC/OS cluster.
@@ -143,7 +184,9 @@ def create(
     workspace_dir.mkdir(parents=True)
     ssh_keypair_dir = workspace_dir / 'ssh'
     ssh_keypair_dir.mkdir(parents=True)
-    key_name = 'dcos-e2e-{random}'.format(random=uuid.uuid4().hex)
+    random_name = 'dcos-e2e-{random}'.format(random=uuid.uuid4().hex)
+    key_name = random_name
+    aws_cloudformation_stack_name = random_name
     public_key_path = ssh_keypair_dir / 'id_rsa.pub'
     private_key_path = ssh_keypair_dir / 'id_rsa'
     write_key_pair(
@@ -159,22 +202,41 @@ def create(
 
     doctor_message = 'Try `dcos-aws doctor` for troubleshooting help.'
     enterprise = bool(variant == 'enterprise')
-    aws_cloudformation_stack_name = 'dcos-e2e-{random}'.format(
-        random=str(uuid.uuid4()),
-    )
-    cluster_backend = AWS(
-        aws_key_pair=(key_name, private_key_path),
-        workspace_dir=workspace_dir,
-        aws_region=aws_region,
-        aws_cloudformation_stack_name=aws_cloudformation_stack_name,
-        linux_distribution=LINUX_DISTRIBUTIONS[linux_distribution],
-    )
+
     ssh_user = {
         Distribution.CENTOS_7: 'centos',
         Distribution.COREOS: 'core',
         Distribution.UBUNTU_16_04: 'ubuntu',
+        Distribution.RHEL_7: 'ec2-user',
     }
-    default_user = ssh_user[cluster_backend.linux_distribution]
+
+    distribution = LINUX_DISTRIBUTIONS[linux_distribution]
+
+    default_user = ssh_user[distribution]
+
+    cluster_tags = {
+        SSH_USER_TAG_KEY: default_user,
+        CLUSTER_ID_TAG_KEY: cluster_id,
+        WORKSPACE_DIR_TAG_KEY: str(workspace_dir),
+        KEY_NAME_TAG_KEY: key_name,
+        VARIANT_TAG_KEY: 'ee' if enterprise else '',
+        CLOUDFORMATION_STACK_NAME_TAG_KEY: aws_cloudformation_stack_name,
+        **custom_tag,
+    }
+
+    master_tags = {NODE_TYPE_TAG_KEY: NODE_TYPE_MASTER_TAG_VALUE}
+    agent_tags = {NODE_TYPE_TAG_KEY: NODE_TYPE_AGENT_TAG_VALUE}
+    public_agent_tags = {NODE_TYPE_TAG_KEY: NODE_TYPE_PUBLIC_AGENT_TAG_VALUE}
+    cluster_backend = AWS(
+        aws_key_pair=(key_name, private_key_path),
+        workspace_dir=workspace_dir,
+        aws_region=aws_region,
+        linux_distribution=distribution,
+        ec2_instance_tags=cluster_tags,
+        master_ec2_instance_tags=master_tags,
+        agent_ec2_instance_tags=agent_tags,
+        public_agent_ec2_instance_tags=public_agent_tags,
+    )
 
     if enterprise:
         superuser_username = 'admin'
@@ -204,69 +266,6 @@ def create(
         click.echo('Error creating cluster.', err=True)
         click.echo(doctor_message)
         sys.exit(exc.returncode)
-
-    ec2_instances = ec2.instances.all()
-
-    cluster_id_tag = {
-        'Key': SSH_USER_TAG_KEY,
-        'Value': default_user,
-    }
-
-    ssh_user_tag = {
-        'Key': CLUSTER_ID_TAG_KEY,
-        'Value': cluster_id,
-    }
-
-    workspace_tag = {
-        'Key': WORKSPACE_DIR_TAG_KEY,
-        'Value': str(workspace_dir),
-    }
-
-    key_name_tag = {
-        'Key': KEY_NAME_TAG_KEY,
-        'Value': key_name,
-    }
-
-    variant_tag = {
-        'Key': VARIANT_TAG_KEY,
-        'Value': 'ee' if enterprise else '',
-    }
-
-    cloudformation_stack_name_tag = {
-        'Key': CLOUDFORMATION_STACK_NAME_TAG_KEY,
-        'Value': aws_cloudformation_stack_name,
-    }
-
-    for nodes, tag_value in (
-        (cluster.masters, NODE_TYPE_MASTER_TAG_VALUE),
-        (cluster.agents, NODE_TYPE_AGENT_TAG_VALUE),
-        (cluster.public_agents, NODE_TYPE_PUBLIC_AGENT_TAG_VALUE),
-    ):
-        if not nodes:
-            continue
-
-        node_public_ips = set(str(node.public_ip_address) for node in nodes)
-        instance_ids = [
-            instance.id for instance in ec2_instances
-            if instance.public_ip_address in node_public_ips
-        ]
-        role_tag = {
-            'Key': NODE_TYPE_TAG_KEY,
-            'Value': tag_value,
-        }
-
-        ec2.create_tags(
-            Resources=instance_ids,
-            Tags=[
-                cloudformation_stack_name_tag,
-                cluster_id_tag,
-                key_name_tag,
-                role_tag,
-                ssh_user_tag,
-                variant_tag,
-                workspace_tag,
-            ],
-        )
 
     nodes = {*cluster.masters, *cluster.agents, *cluster.public_agents}
     for node in nodes:

@@ -133,6 +133,8 @@ class TestCreate:
                               If none of these are set, ``license_key_contents`` is not given.
 
             Options:
+              --custom-tag TEXT               Add tags to EC2 instances in the format
+                                              "<TAG_KEY>:<TAG_VALUE>".
               --variant [oss|enterprise]      Choose the DC/OS variant. If the variant does
                                               not match the variant of the given artifact
                                               URL, an error will occur.
@@ -145,7 +147,7 @@ class TestCreate:
               --public-agents INTEGER         The number of public agent nodes.  [default:
                                               1]
               --aws-region TEXT               The AWS region to use.  [default: us-west-2]
-              --linux-distribution [centos-7]
+              --linux-distribution [centos-7|rhel-7]
                                               The Linux distribution to use on the nodes.
                                               [default: centos-7]
               --workspace-dir PATH            Creating a cluster can use approximately 2 GB
