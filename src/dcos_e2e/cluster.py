@@ -504,6 +504,27 @@ class Cluster(ContextDecorator):
                         output=output,
                     )
 
+    def upgrade_dcos_from_path(
+        self,
+        dcos_installer: Path,
+    ) -> None:
+        for nodes, role in (
+            (self.masters, Role.MASTER),
+            (self.agents, Role.AGENT),
+            (self.public_agents, Role.PUBLIC_AGENT),
+        ):
+            for node in nodes:
+                node.upgrade_dcos_from_path(
+                    dcos_installer=dcos_installer,
+                    dcos_config=dcos_config,
+                    ip_detect_path=ip_detect_path,
+                    role=role,
+                    files_to_copy_to_genconf_dir=(
+                        files_to_copy_to_genconf_dir
+                    ),
+                    output=output,
+                )
+
     def install_dcos_from_path(
         self,
         dcos_installer: Path,

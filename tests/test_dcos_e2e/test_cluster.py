@@ -462,6 +462,46 @@ class TestClusterFromNodes:
             cluster.wait_for_dcos_oss()
 
 
+class TestUpgrade:
+    """
+    Tests for upgrading a cluster.
+    """
+
+    def test_upgrade(
+        self,
+        cluster_backend: ClusterBackend,
+        oss_1_11_installer: Path,
+        oss_1_12_installer: Path,
+    ) -> None:
+        with Cluster(
+            cluster_backend=cluster_backend,
+            masters=1,
+            agents=1,
+            public_agents=1,
+        ) as cluster:
+            cluster.install_dcos_from_path(
+                dcos_installer=oss_1_11_installer,
+                dcos_config=cluster.base_config,
+                ip_detect_path=cluster_backend.ip_detect_path,
+            )
+
+            cluster.wait_for_dcos_oss()
+
+            cluster.upgrade_dcos_from_path(
+                # TODO: Maybe it is necessary to pass a 'from' version?
+                dcos_installer=oss_1_12_installer,
+            )
+            cluster.wait_for_dcos_oss()
+            # TODO:
+            # * Get the 'get version' part to work
+            # * Run this before the upgrade to assert the difference
+            # * Do we need to run this on all nodes, not just a master?
+            # * Is it useful to have a multi-master test?
+            (master, ) = cluster.masters
+            version = master.run('/opt/mesosphere/get_version/foobar...').stdout
+            assert version.startswith('1.12')
+
+
 class TestDestroyNode:
     """
     Tests for destroying nodes.
