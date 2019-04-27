@@ -6,9 +6,9 @@ import sys
 import uuid
 
 import requests
-
 import cerberus
 import yaml
+
 from ..dcos_launch import util
 from ..dcos_launch.platforms import aws, gcp
 
@@ -92,6 +92,24 @@ def get_validated_config_from_path(config_path: str) -> dict:
     return get_validated_config(config, config_dir)
 
 
+def check_selinux_compatible(version: str):
+    """ Checks if the version is higher or equal to 1.12
+    """
+    if not version:
+        return False
+    if version == 'master':
+        return True
+    split_version = version.split('.')
+    major = int(split_version[0])
+    minor = int(split_version[1])
+    if major > 1:
+        return True
+    if major == 1:
+        if minor >= 12:
+            return True
+    return False
+
+
 def get_validated_config(user_config: dict, config_dir: str) -> dict:
     """ Returns validated a finalized argument dictionary for dcos-launch
     Given the huge range of configuration space provided by this configuration
@@ -105,9 +123,12 @@ def get_validated_config(user_config: dict, config_dir: str) -> dict:
     owner = os.environ.get('USER')
     if owner:
         user_config.setdefault('tags', {'owner': owner})
+
     # validate against the fields common to all configs
     user_config['config_dir'] = config_dir
     validator = LaunchValidator(COMMON_SCHEMA, config_dir=config_dir, allow_unknown=True)
+    if 'dcos_version' in user_config:
+        user_config['dcos_version'] = validator.normalized(user_config)['dcos_version']
     if not validator.validate(user_config):
         _raise_errors(validator)
 
@@ -115,12 +136,15 @@ def get_validated_config(user_config: dict, config_dir: str) -> dict:
     provider = validator.normalized(user_config)['provider']
     if provider == 'onprem':
         validator.schema.update(ONPREM_DEPLOY_COMMON_SCHEMA)
+        user_config.setdefault('dcos_config', {})
+        user_config['dcos_config'].setdefault('platform', user_config['platform'])
+        user_config['dcos_config'].setdefault('rexray_config_preset', user_config['platform'])
     elif provider == 'terraform':
         validator.schema.update(TERRAFORM_COMMON_SCHEMA)
     elif provider in ('aws', 'azure'):
         validator.schema.update(TEMPLATE_DEPLOY_COMMON_SCHEMA)
-    elif provider == 'acs-engine':
-        validator.schema.update(ACS_ENGINE_SCHEMA)
+    elif provider == 'dcos-engine':
+        validator.schema.update(DCOS_ENGINE_SCHEMA)
     else:
         raise Exception('Unknown provider!: {}'.format(provider))
 
@@ -135,6 +159,20 @@ def get_validated_config(user_config: dict, config_dir: str) -> dict:
             user_config['terraform_config']['gcp_ssh_user'] = user_config['ssh_user']
         else:
             raise Exception('Cannot currently set ssh_user parameter for ' + platform)
+
+    if validator.normalized(user_config).get('auto_set_selinux'):
+        if 'enable_selinux' in user_config:
+            raise Exception('Parameter conflict: enable_selinux cannot be in config if auto_set_selinux is true')
+
+        selinux_compatible = False
+        try:
+            selinux_compatible = check_selinux_compatible(user_config.get('dcos_version', ''))
+        except Exception:
+            pass
+
+        user_config['enable_selinux'] = selinux_compatible and \
+            'dcos-enterprise' in user_config['installer_url'] and \
+            user_config['os_name'] == 'cent-os-7-dcos-prereqs'
 
     if platform == 'aws':
         region = None
@@ -185,6 +223,9 @@ def get_validated_config(user_config: dict, config_dir: str) -> dict:
     validator.allow_unknown = False
     if not validator.validate(user_config):
         _raise_errors(validator)
+    if 'genconf_dir' in user_config:
+        if 'dcos_config' in user_config:
+            _validate_genconf_scripts(user_config['genconf_dir'], user_config['dcos_config'])
     return validator.normalized(user_config)
 
 
@@ -195,13 +236,16 @@ COMMON_SCHEMA = {
         'allowed': [
             'aws',
             'azure',
-            'acs-engine',
+            'dcos-engine',
             'onprem',
             'terraform']},
     'config_dir': {
         'type': 'string',
-        'required': False
-    },
+        'required': False},
+    'dcos_version': {
+        'type': ['string', 'float'],
+        'required': False,
+        'coerce': lambda version: str(version)},
     'launch_config_version': {
         'type': 'integer',
         'required': True,
@@ -263,13 +307,29 @@ def _validate_fault_domain_helper(field, value, error):
 
 def _validate_genconf_dir(field, value, error):
     if not value.endswith('genconf'):
-        error(field, 'genconf_dir must be named geconf')
+        error(field, 'genconf_dir must be named genconf')
+
+
+def _validate_genconf_scripts(genconf_dir, dcos_config):
+    for script in ('ip_detect', 'ip_detect_public', 'fault_domain_detect'):
+        filename_key = script + '_filename'
+        if filename_key in dcos_config:
+            if os.path.isabs(dcos_config[filename_key]):
+                continue
+            if not os.path.exists(os.path.join(genconf_dir, dcos_config[filename_key])):
+                raise util.LauncherError('FileNotFoundError', '{} script must exist in the genconf dir ({})'.format(
+                    dcos_config[filename_key], genconf_dir))
 
 
 ONPREM_DEPLOY_COMMON_SCHEMA = {
     'deployment_name': {
         'type': 'string',
         'required': True},
+    'auto_set_selinux': {
+        'type': 'boolean',
+        'default': False},
+    'enable_selinux': {
+        'type': 'boolean'},
     'platform': {
         'type': 'string',
         'required': True,
@@ -311,16 +371,12 @@ ONPREM_DEPLOY_COMMON_SCHEMA = {
         'default_setter': lambda doc: yaml.load(util.read_file(os.path.join(doc['genconf_dir'], 'config.yaml'))),
         'schema': {
             'ip_detect_filename': {
-                'coerce': 'expand_local_path',
                 'excludes': 'ip_detect_contents'},
             'ip_detect_public_filename': {
-                'coerce': 'expand_local_path',
                 'excludes': 'ip_detect_public_contents'},
             'fault_domain_detect_filename': {
-                'coerce': 'expand_local_path',
                 'excludes': 'fault_domain_detect_contents'},
             'license_key_filename': {
-                'coerce': 'expand_local_path',
                 'excludes': 'license_key_contents'},
             # the following are fields that will be injected by dcos-launch
             'agent_list': {'readonly': True},
@@ -363,7 +419,7 @@ ONPREM_DEPLOY_COMMON_SCHEMA = {
     },
     'prereqs_script_filename': {
         'type': 'string',
-        'default': 'unset'
+        'default': 'install_prereqs.sh'
     },
     'install_prereqs': {
         'type': 'boolean',
@@ -393,7 +449,7 @@ AWS_ONPREM_SCHEMA = {
         'type': 'string',
         'required': False,
         # bootstrap node requires docker to be installed
-        'default': 'cent-os-7-dcos-prereqs',
+        'default': 'cent-os-7.4-with-docker-selinux-disabled',
         'allowed': list(aws.OS_AMIS.keys())},
     'instance_ami': {
         'type': 'string',
@@ -470,24 +526,24 @@ def get_platform_dependent_url(url_to_format: str, error_msg: str) -> str:
         raise Exception(error_msg)
 
 
-ACS_ENGINE_SCHEMA = {
+DCOS_ENGINE_SCHEMA = {
     'deployment_name': {
         'type': 'string',
         'required': True},
-    'acs_version': {
+    'dcos_engine_version': {
         'type': 'string',
-        'default_setter': lambda doc: get_latest_github_release('Azure', 'acs-engine', '0.16.2')
+        'default_setter': lambda doc: get_latest_github_release('Azure', 'dcos-engine', '0.2.0')
     },
-    'acs_engine_tarball_url': {
+    'dcos_engine_tarball_url': {
         'type': 'string',
         'default_setter': lambda doc: get_platform_dependent_url(
-            'https://github.com/Azure/acs-engine/releases/download/v{0}/acs-engine-v{0}-{1}-amd64.tar.gz'.
-                format(doc['acs_version'], '{}'),
-            'No ACS-Engine distribution for {}'.format(sys.platform))},
+            'https://github.com/Azure/dcos-engine/releases/download/v{0}/dcos-engine-v{0}-{1}-amd64.tar.gz'.
+                format(doc['dcos_engine_version'], '{}'),
+            'No DCOS-Engine distribution for {}'.format(sys.platform))},
     'acs_template_filename': {
         'type': 'string',
         'required': False},
-    'acs_engine_dcos_orchestrator_release': {
+    'dcos_engine_orchestrator_release': {
         'type': 'string',
         'default': '1.11'},
     'platform': {
@@ -540,6 +596,9 @@ ACS_ENGINE_SCHEMA = {
     'template_parameters': {
         'type': 'dict'},
     'dcos_linux_bootstrap_url': {
+        'type': 'string',
+        'required': False},
+    'dcos_windows_bootstrap_url': {
         'type': 'string',
         'required': False},
     'windows_publisher': {

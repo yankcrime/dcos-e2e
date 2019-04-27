@@ -14,7 +14,7 @@ import yaml
 from dcos_e2e._vendor import vertigo_py
 from dcos_e2e.backends import Vagrant
 from dcos_e2e.cluster import Cluster
-from dcos_e2e.node import Node
+from dcos_e2e.node import Node, Output
 
 
 @pytest.mark.skipif(
@@ -28,7 +28,7 @@ class TestRunIntegrationTest:  # pragma: no cover
 
     def test_run_integration_test(
         self,
-        oss_artifact: Path,
+        oss_installer: Path,
     ) -> None:
         """
         It is possible to run DC/OS integration tests on Vagrant.
@@ -42,9 +42,9 @@ class TestRunIntegrationTest:  # pragma: no cover
             public_agents=1,
         ) as cluster:
             cluster.install_dcos_from_path(
-                build_artifact=oss_artifact,
+                dcos_installer=oss_installer,
                 dcos_config=cluster.base_config,
-                log_output_live=True,
+                output=Output.CAPTURE,
                 ip_detect_path=cluster_backend.ip_detect_path,
             )
 
@@ -53,7 +53,7 @@ class TestRunIntegrationTest:  # pragma: no cover
             # No error is raised with a successful command.
             cluster.run_integration_tests(
                 pytest_command=['pytest', '-vvv', '-s', '-x', 'test_units.py'],
-                log_output_live=True,
+                output=Output.CAPTURE,
             )
 
 
@@ -71,7 +71,9 @@ def _ip_from_vm_name(vm_name: str,
         property_name,
     ]
     property_result = vertigo_py.execute(args=args)  # type: ignore
-    results = yaml.load(property_result)
+    # Ignoring error because of https://github.com/python/typeshed/issues/2886.
+    loader = yaml.FullLoader  # type: ignore
+    results = yaml.load(property_result, Loader=loader)
     if results == 'No value set!':
         return None
     return IPv4Address(results['Value'])

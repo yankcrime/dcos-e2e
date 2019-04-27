@@ -2,18 +2,17 @@
 Vagrant backend.
 """
 
-import inspect
 import os
 import shutil
 import uuid
 from ipaddress import IPv4Address
 from pathlib import Path
 from tempfile import gettempdir
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Type
+from typing import Any, Dict, Iterable, Optional, Set, Tuple, Type
 
-from dcos_e2e.node import Node
-
-from .._base_classes import ClusterBackend, ClusterManager
+from dcos_e2e.base_classes import ClusterBackend, ClusterManager
+from dcos_e2e.cluster import Cluster
+from dcos_e2e.node import Node, Output
 
 
 class Vagrant(ClusterBackend):
@@ -59,9 +58,25 @@ class Vagrant(ClusterBackend):
         """
         Return the path to the Vagrant specific ``ip-detect`` script.
         """
-        current_file = inspect.stack()[0][1]
-        current_parent = Path(os.path.abspath(current_file)).parent
+        current_parent = Path(__file__).parent.resolve()
         return current_parent / 'resources' / 'ip-detect'
+
+    @property
+    def base_config(self) -> Dict[str, Any]:
+        """
+        Return a base configuration for installing DC/OS OSS.
+        """
+        # See https://jira.mesosphere.com/browse/DCOS_OSS-2501
+        # for removing "check_time: 'false'".
+        return {
+            'check_time': 'false',
+            'cluster_name': 'DCOS',
+            'exhibitor_storage_backend': 'static',
+            'master_discovery': 'static',
+            'resolvers': ['8.8.8.8'],
+            'ssh_port': 22,
+            'ssh_user': 'vagrant',
+        }
 
 
 class VagrantCluster(ClusterManager):
@@ -74,7 +89,6 @@ class VagrantCluster(ClusterManager):
         masters: int,
         agents: int,
         public_agents: int,
-        files_to_copy_to_installer: List[Tuple[Path, Path]],
         cluster_backend: Vagrant,
     ) -> None:
         """
@@ -84,22 +98,8 @@ class VagrantCluster(ClusterManager):
             masters: The number of master nodes to create.
             agents: The number of agent nodes to create.
             public_agents: The number of public agent nodes to create.
-            files_to_copy_to_installer: Pairs of host paths to paths on
-                the installer node. These are files to copy from the host to
-                the installer node before installing DC/OS.
             cluster_backend: Details of the specific Docker backend to use.
-
-        Raises:
-            NotImplementedError: ``files_to_copy_to_installer`` includes files
-                to copy to the installer.
         """
-        if files_to_copy_to_installer:
-            message = (
-                'Copying files to the installer is currently not supported by '
-                'the Vagrant backend.'
-            )
-            raise NotImplementedError(message)
-
         cluster_id = 'dcos-e2e-{random}'.format(random=uuid.uuid4())
         self._master_prefix = cluster_id + '-master-'
         self._agent_prefix = cluster_id + '-agent-'
@@ -141,57 +141,81 @@ class VagrantCluster(ClusterManager):
             root=str(path),
             env=vagrant_env,
             quiet_stdout=False,
-            quiet_stderr=True,
+            quiet_stderr=False,
         )
 
         self._vagrant_client.up()
 
-    def install_dcos_from_url_with_bootstrap_node(
+    def install_dcos_from_url(
         self,
-        build_artifact: str,
+        dcos_installer: str,
         dcos_config: Dict[str, Any],
         ip_detect_path: Path,
-        log_output_live: bool,
+        output: Output,
         files_to_copy_to_genconf_dir: Iterable[Tuple[Path, Path]],
     ) -> None:
         """
-        Install DC/OS from a build artifact passed as an URL string.
+        Install DC/OS from an installer passed as an URL string.
 
         Args:
-            build_artifact: The URL string to a build artifact to install DC/OS
+            dcos_installer: The URL string to an installer to install DC/OS
                 from.
             dcos_config: The DC/OS configuration to use.
             ip_detect_path: The ``ip-detect`` script that is used for
                 installing DC/OS.
-            log_output_live: If ``True``, log output of the installation live.
+            output: What happens with stdout and stderr.
             files_to_copy_to_genconf_dir: Pairs of host paths to paths on the
                 installer node. This must be empty as it is not currently
                 supported.
         """
-        raise NotImplementedError
+        cluster = Cluster.from_nodes(
+            masters=self.masters,
+            agents=self.agents,
+            public_agents=self.public_agents,
+        )
 
-    def install_dcos_from_path_with_bootstrap_node(
+        cluster.install_dcos_from_url(
+            dcos_installer=dcos_installer,
+            dcos_config=dcos_config,
+            ip_detect_path=ip_detect_path,
+            output=output,
+            files_to_copy_to_genconf_dir=files_to_copy_to_genconf_dir,
+        )
+
+    def install_dcos_from_path(
         self,
-        build_artifact: Path,
+        dcos_installer: Path,
         dcos_config: Dict[str, Any],
         ip_detect_path: Path,
-        log_output_live: bool,
+        output: Output,
         files_to_copy_to_genconf_dir: Iterable[Tuple[Path, Path]],
     ) -> None:
         """
-        Install DC/OS from a build artifact passed as a file system `Path`.
+        Install DC/OS from an installer passed as a file system `Path`.
 
         Args:
-            build_artifact: The path to a build artifact to install DC/OS from.
+            dcos_installer: The path to an installer to install DC/OS from.
             dcos_config: The DC/OS configuration to use.
             ip_detect_path: The ``ip-detect`` script that is used for
                 installing DC/OS.
-            log_output_live: If ``True``, log output of the installation live.
+            output: What happens with stdout and stderr.
             files_to_copy_to_genconf_dir: Pairs of host paths to paths on the
                 installer node. This must be empty as it is not currently
                 supported.
         """
-        raise NotImplementedError
+        cluster = Cluster.from_nodes(
+            masters=self.masters,
+            agents=self.agents,
+            public_agents=self.public_agents,
+        )
+
+        cluster.install_dcos_from_path(
+            dcos_installer=dcos_installer,
+            dcos_config=dcos_config,
+            ip_detect_path=ip_detect_path,
+            output=output,
+            files_to_copy_to_genconf_dir=files_to_copy_to_genconf_dir,
+        )
 
     def destroy_node(self, node: Node) -> None:
         """
@@ -283,18 +307,3 @@ class VagrantCluster(ClusterManager):
         Return all DC/OS public agent :class:`.node.Node` s.
         """
         return self._nodes(node_base_name=self._public_agent_prefix)
-
-    @property
-    def base_config(self) -> Dict[str, Any]:
-        """
-        Return a base configuration for installing DC/OS OSS.
-        """
-        return {
-            'check_time': 'false',
-            'cluster_name': 'DCOS',
-            'exhibitor_storage_backend': 'static',
-            'master_discovery': 'static',
-            'resolvers': ['8.8.8.8'],
-            'ssh_port': 22,
-            'ssh_user': 'vagrant',
-        }

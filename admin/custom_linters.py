@@ -1,16 +1,19 @@
 """
-Custom lint tests for DC/OS E2E.
+Custom lint tests.
 """
 
 import subprocess
+import sys
+from collections import defaultdict
 from pathlib import Path
-from typing import Dict  # noqa: F401
+from typing import List  # noqa: F401
+from typing import Mapping  # noqa: F401
 from typing import Set
 
 import pytest
 import yaml
 
-from run_script import PATTERNS
+from admin.download_installers import PATTERNS
 
 
 def _travis_ci_patterns() -> Set[str]:
@@ -19,7 +22,9 @@ def _travis_ci_patterns() -> Set[str]:
     """
     travis_file = Path(__file__).parent.parent / '.travis.yml'
     travis_contents = travis_file.read_text()
-    travis_dict = yaml.load(travis_contents)
+    # Ignoring error because of https://github.com/python/typeshed/issues/2886.
+    loader = yaml.FullLoader  # type: ignore
+    travis_dict = yaml.load(travis_contents, Loader=loader)
     travis_matrix = travis_dict['env']['matrix']
 
     ci_patterns = set()  # type: Set[str]
@@ -52,7 +57,7 @@ def _tests_from_pattern(ci_pattern: str) -> Set[str]:
 def test_ci_patterns_match() -> None:
     """
     The patterns in ``.travis.yml`` must match the patterns in
-    ``admin/run_script.py``.
+    ``admin/download_installers.py``.
     """
     ci_patterns = _travis_ci_patterns()
     assert ci_patterns - PATTERNS.keys() == set()
@@ -82,14 +87,11 @@ def test_tests_collected_once() -> None:
     This does not necessarily mean that they are run - they may be skipped.
     """
     ci_patterns = _travis_ci_patterns()
-    tests_to_patterns = {}  # type: Dict[str, Set[str]]
+    tests_to_patterns = defaultdict(list)  # type: Mapping[str, List]
     for pattern in ci_patterns:
         tests = _tests_from_pattern(ci_pattern=pattern)
         for test in tests:
-            if test in tests_to_patterns:
-                tests_to_patterns[test].add(pattern)
-            else:
-                tests_to_patterns[test] = set([pattern])
+            tests_to_patterns[test].append(pattern)
 
     for test_name, patterns in tests_to_patterns.items():
         message = (
@@ -122,3 +124,40 @@ def test_init_files() -> None:
             parent = python_file.parent
             expected_init = parent / '__init__.py'
             assert expected_init.exists()
+
+
+def test_pydocstyle() -> None:
+    """
+    Run ``pydocstyle`` and ignore errors.
+    We could use the "match" ``pydocstyle`` setting, but this involves regular
+    expressions and got too complex.
+    """
+    args = ['pydocstyle']
+    pydocstyle_result = subprocess.run(args=args, stdout=subprocess.PIPE)
+    lines = pydocstyle_result.stdout.decode().strip().split('\n')
+    path_issue_pairs = []
+    for item_number in range(int(len(lines) / 2)):
+        path = lines[item_number * 2] * 2
+        issue = lines[item_number * 2 + 1]
+        path_issue_pairs.append((path, issue))
+
+    real_errors = []
+    ignored_path_substrings = (
+        '_vendor',
+        '_version.py',
+        'versioneer.py',
+        './tests',
+    )
+    for pair in path_issue_pairs:
+        path, issue = pair
+        ignore = False
+        for substring in ignored_path_substrings:
+            if substring in path:
+                ignore = True
+
+        if not ignore:
+            sys.stderr.write(path + '\n')
+            sys.stderr.write(issue + '\n')
+            real_errors.append(pair)
+
+    assert not real_errors

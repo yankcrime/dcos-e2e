@@ -9,7 +9,7 @@ from passlib.hash import sha512_crypt
 from dcos_e2e.backends import AWS
 from dcos_e2e.cluster import Cluster
 from dcos_e2e.distributions import Distribution
-from dcos_e2e.node import Node
+from dcos_e2e.node import Node, Output
 
 
 def _get_node_distribution(node: Node) -> Distribution:
@@ -30,6 +30,9 @@ def _get_node_distribution(node: Node) -> Distribution:
     distributions = {
         ('"centos"', '"7"'): Distribution.CENTOS_7,
         ('"rhel"', '"7.4"'): Distribution.RHEL_7,
+        ('coreos', '1911.3.0'): Distribution.COREOS,
+        ('coreos', '1632.3.0'): Distribution.COREOS,
+        ('coreos', '1967.6.0'): Distribution.COREOS,
     }
 
     distro_id = version_data['ID'].strip()
@@ -40,7 +43,7 @@ def _get_node_distribution(node: Node) -> Distribution:
 
 def _oss_distribution_test(
     distribution: Distribution,
-    oss_artifact_url: str,
+    oss_installer_url: str,
 ) -> None:
     """
     Assert that given a ``linux_distribution``, an open source DC/OS
@@ -57,9 +60,9 @@ def _oss_distribution_test(
         public_agents=0,
     ) as cluster:
         cluster.install_dcos_from_url(
-            build_artifact=oss_artifact_url,
+            dcos_installer=oss_installer_url,
             dcos_config=cluster.base_config,
-            log_output_live=True,
+            output=Output.CAPTURE,
             ip_detect_path=cluster_backend.ip_detect_path,
         )
         cluster.wait_for_dcos_oss()
@@ -71,7 +74,7 @@ def _oss_distribution_test(
 
 def _enterprise_distribution_test(
     distribution: Distribution,
-    ee_artifact_url: str,
+    ee_installer_url: str,
     license_key_contents: str,
 ) -> None:
     """
@@ -98,13 +101,13 @@ def _enterprise_distribution_test(
         public_agents=0,
     ) as cluster:
         cluster.install_dcos_from_url(
-            build_artifact=ee_artifact_url,
+            dcos_installer=ee_installer_url,
             dcos_config={
                 **cluster.base_config,
                 **config,
             },
             ip_detect_path=cluster_backend.ip_detect_path,
-            log_output_live=True,
+            output=Output.CAPTURE,
         )
         cluster.wait_for_dcos_ee(
             superuser_username=superuser_username,
@@ -169,19 +172,19 @@ class TestRHEL7:
 
     def test_oss(
         self,
-        oss_artifact_url: str,
+        oss_installer_url: str,
     ) -> None:
         """
         DC/OS OSS can start up on RHEL7.
         """
         _oss_distribution_test(
             distribution=Distribution.RHEL_7,
-            oss_artifact_url=oss_artifact_url,
+            oss_installer_url=oss_installer_url,
         )
 
     def test_enterprise(
         self,
-        ee_artifact_url: str,
+        ee_installer_url: str,
         license_key_contents: str,
     ) -> None:
         """
@@ -189,6 +192,38 @@ class TestRHEL7:
         """
         _enterprise_distribution_test(
             distribution=Distribution.RHEL_7,
-            ee_artifact_url=ee_artifact_url,
+            ee_installer_url=ee_installer_url,
+            license_key_contents=license_key_contents,
+        )
+
+
+class TestCoreOS:
+    """
+    Tests for the CoreOS distribution option.
+    """
+
+    def test_oss(
+        self,
+        oss_installer_url: str,
+    ) -> None:
+        """
+        DC/OS OSS can start up on CoreOS.
+        """
+        _oss_distribution_test(
+            distribution=Distribution.COREOS,
+            oss_installer_url=oss_installer_url,
+        )
+
+    def test_enterprise(
+        self,
+        ee_installer_url: str,
+        license_key_contents: str,
+    ) -> None:
+        """
+        DC/OS Enterprise can start up on CoreOS.
+        """
+        _enterprise_distribution_test(
+            distribution=Distribution.COREOS,
+            ee_installer_url=ee_installer_url,
             license_key_contents=license_key_contents,
         )

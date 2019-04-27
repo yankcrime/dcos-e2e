@@ -6,6 +6,288 @@ Changelog
 Next
 ----
 
+* Remove use of ``select`` which is not supported on Windows.
+* ``minidcos docker clean`` will no longer clean up containers which are started from now on by the tooling to create a custom macOS network.
+
+2019.04.25.0
+------------
+
+2019.04.23.1
+------------
+
+* The ``wait_for_dcos_oss`` and ``wait_for_dcos_ee`` methods no longer log output of node poststart check command run.
+* The ``Node.run`` method logs the command that is going to execute with ``debug`` level if ``output`` is configured to ``LOG_AND_CAPTURE``.
+* The ``Node.run`` method no longer logs ``stderr`` when ``Output.CAPTURE`` is used.
+* The ``Node.run`` method no longer merges ``stderr`` into ``stdout`` when ``Output.LOG_AND_CAPTURE`` is used.
+
+2019.04.23.0
+------------
+
+* The library no longer configures logger handler. Applications using ``dcos_e2e`` library that were relying on logging being printed to stdout should configure ``logging`` on its own.
+
+2019.04.18.2
+------------
+
+2019.04.18.1
+------------
+
+* Add new commands to ``minidcos vagrant`` and ``minidcos aws`` to provision a bare cluster (``provision``) and install DC/OS on a bare cluster (``install``).
+
+2019.04.18.0
+------------
+
+* Improve the spinner while waiting for ``minidcos`` commands.
+* Add ``send-file`` commands to ``minidcos`` subcommands.
+* Remove ``--env`` option on ``minidcos docker inspect``.
+* Custom backends must now specify the base config in the ``ClusterBackend`` rather than the ``ClusterManager``.
+* Add new commands to ``minidcos docker`` to provision a bare cluster (``provision``) and install DC/OS on a bare cluster (``install``).
+
+2019.04.08.1
+------------
+
+* Add ``minidcos vagrant clean`` command to clean up left over VMs.
+
+2019.04.08.0
+------------
+
+* Allow multiple ``--node`` options on ``run`` commands to run a command on multiple nodes.
+* ``minidcos vagrant list`` will now not show clusters with aborted VMs.
+  A VM is aborted for example if the host is shut down.
+
+2019.04.02.1
+------------
+
+* Make various ``minidcos`` commands faster by using caching.
+
+2019.04.02.0
+------------
+
+* Remove warnings about YAML when running ``minidcos vagrant``.
+
+2019.03.28.0
+------------
+
+* Change names of install functions for custom backends to remove ``_with_bootstrap_node``.
+
+2019.03.27.0
+------------
+
+* Allow login after ``minidcos docker wait`` on DC/OS OSS 1.13.
+
+2019.03.23.0
+------------
+
+2019.03.22.1
+------------
+
+2019.03.22.0
+------------
+
+2019.03.13.0
+------------
+
+2019.02.17.1
+------------
+
+2019.02.17.0
+------------
+
+2019.02.16.0
+------------
+
+* Mount ``/sys/fs/cgroup`` into Docker agents by default.
+* Add options to the CLI and library to disable mounting ``/sys/fs/cgroup``.
+
+2019.01.29.1
+------------
+
+2019.01.29.0
+------------
+
+2019.01.27.1
+------------
+
+* Stop mounting ``/sys/fs/cgroup`` into Docker agents.
+
+2019.01.27.0
+------------
+
+* Add more ``minidcos docker doctor`` checks.
+
+2019.01.10.0
+------------
+
+- Fix issue where "RuntimeError: cannot join current thread" was shown.
+
+2019.01.05.0
+------------
+
+- Backwards incompatible change: Move ``ClusterBackend`` and ``ClusterManager`` to ``dcos_e2e.base_classes``.
+
+2018.12.10.0
+------------
+
+2018.12.05.0
+------------
+
+- Limit UUID in the cluster ID to 5 characters to avoid problems with Docker.
+
+2018.12.01.1
+------------
+
+2018.12.01.0
+------------
+
+- Ship type hints for other packages to use.
+
+2018.11.22.0
+------------
+
+- Allow ``-h`` instead of ``--help`` on all CLI commands.
+
+2018.11.21.0
+------------
+
+2018.11.20.1
+------------
+
+- Allow multiple ``--sync-dir`` options to be given to ``run`` commands.
+
+2018.11.20.0
+------------
+
+- Rename ``build_artifact`` and related variables to "installer".
+- If syncing a DC/OS OSS repository to a DC/OS Enterprise cluster, only Open
+  Source tests are synced.
+
+2018.11.16.2
+------------
+
+2018.11.16.1
+------------
+
+- Backwards incompatible change: Changed CLI commands from ``dcos-docker`` to ``minidcos docker`` and alike.
+
+2018.11.16.0
+------------
+
+- Add a ``dcos-docker doctor`` check for systemd.
+- Add a progress bar for ``doctor`` commands.
+- Log subprocess output unicode characters where possible.
+
+2018.11.09.1
+------------
+
+- Backwards incompatible change: Change ``--no-test-env`` to ``--test-env`` on ``run`` commands, with the opposite default.
+
+2018.11.09.0
+------------
+
+- Fix an issue which caused incompatible version errors between ``keyring`` and ``SecretStore`` dependencies.
+
+2018.11.07.1
+------------
+
+2018.11.07.0
+------------
+
+- Add ``dcos-docker create-loopback-sidecar`` and ``dcos-docker destroy-loopback-sidecar`` commands to provide unformatted block devices to DC/OS.
+- Add ``dcos-docker clean`` command to clean left over artifacts.
+- Backwards incompatible change: Changed names of VPN containers on macOS.
+
+2018.10.17.1
+------------
+
+2018.10.17.0
+------------
+
+- Fix an issue which stopped the SSH transport from working on CLIs.
+
+2018.10.16.0
+------------
+
+- Remove ``log_output_live`` parameters on various functions in favor of new ``output`` options.
+- ``Node.__init__``'s ``ssh_key_path`` parameter now expects a path to an SSH key file with specific permissions.
+   See the documentation for this class for details.
+
+2018.10.13.0
+------------
+
+2018.10.12.2
+------------
+
+2018.10.12.1
+------------
+
+2018.10.12.0
+------------
+
+- The ``docker-exec`` transport uses interactive mode only when running in a terminal.
+
+2018.10.11.3
+------------
+
+2018.10.11.2
+------------
+
+2018.10.11.1
+------------
+
+2018.10.11.0
+------------
+
+- Show full path on ``download-artifact`` downloads.
+- Default to downloading to the current directory for ``download-artifact`` downloads.
+- Use a TTY on CLI run commands only if Stdin is a TTY.
+
+2018.10.10.0
+------------
+
+- Fix issues which stopped pre-built Linux binaries from working.
+
+2018.09.25.0
+------------
+
+- ``wait_for_dcos_oss`` and ``wait_for_dcos_ee`` now raise a custom ``DCOSTimeoutError`` if DC/OS has not started within one hour.
+
+2018.09.06.0
+------------
+
+- The ``--variant`` option is now required for the ``dcos-aws`` CLI.
+- Added the ability to install on Linux from a pre-built binary.
+- Add the ability to do a release to a fork.
+
+2018.08.31.0
+------------
+
+- Fix using macOS with no custom network.
+
+2018.08.28.0
+------------
+
+- Support for CoreOS on the AWS backend.
+- Fix an issue which prevented the Vagrant backend from working.
+
+2018.08.22.0
+------------
+
+- Improve diagnostics when creating a Docker-backed cluster with no running Docker daemon.
+
+2018.08.13.0
+------------
+
+- Add instructions for uninstalling |project-name|.
+
+2018.08.03.0
+------------
+
+- Pin ``msrestazure`` pip dependency to specific version to avoid dependency conflict.
+
+2018.07.31.0
+------------
+
+- Add a ``dcos-docker doctor`` check that relevant Docker images can be built.
+
 2018.07.30.0
 ------------
 
@@ -258,8 +540,8 @@ Next
 2018.02.28.0
 ------------
 
-- Add ``Vagrantfile`` to run DC/OS E2E in a virtual machine.
-- Add instructions for running DC/OS E2E on Windows.
+- Add ``Vagrantfile`` to run |project-name| in a virtual machine.
+- Add instructions for running |project-name| on Windows.
 - Allow relative paths for the build artifact.
 
 2018.02.27.0
@@ -418,3 +700,10 @@ Next
 ------------
 
 -  Initial release.
+
+.. This document is included in the source tree as well as the Sphinx documentation.
+.. We automatically define |project| in all Sphinx documentation.
+.. Defining |project| twice causes an error.
+.. We need it defined both in the source tree view (GitHub preview) and in Sphinx.
+.. We therefore use |project-name| in this document.
+.. |project-name| replace:: DC/OS E2E
