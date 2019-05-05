@@ -3,9 +3,11 @@ Setup script for DC/OS End to End tests.
 """
 
 from pathlib import Path
-import versioneer
-from setuptools import find_packages, setup
 from typing import List
+
+from setuptools import find_packages, setup
+
+import versioneer
 
 
 def _get_dependencies(requirements_file: Path) -> List[str]:
