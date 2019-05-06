@@ -2,33 +2,24 @@
 
 SHELL := /bin/bash -euxo pipefail
 
-.PHONY: yapf
-yapf:
-	yapf --diff --recursive .
-
 .PHONY: fix-yapf
 fix-yapf:
-	yapf --in-place --recursive .
+	yapf \
+		--style='{DEDENT_CLOSING_BRACKETS: true}' \
+		--in-place \
+		--recursive \
+		--exclude='**/_vendor' \
+		--exclude='versioneer.py' \
+		--exclude='**/_version.py' \
+		.
 
 .PHONY: mypy
 mypy:
 	mypy *.py src/ tests/ admin/
 
-.PHONY: check-manifest
-check-manifest:
-	check-manifest .
-
 .PHONY: doc8
 doc8:
 	doc8 .
-
-.PHONY: flake8
-flake8:
-	flake8 .
-
-.PHONY: isort
-isort:
-	isort --recursive --check-only
 
 .PHONY: pip-extra-reqs
 pip-extra-reqs:
@@ -45,10 +36,6 @@ pylint:
 .PHONY: pyroma
 pyroma:
 	pyroma --min 10 .
-
-.PHONY: vulture
-vulture:
-	vulture --min-confidence 100 --exclude _vendor .
 
 .PHONY: linkcheck
 linkcheck:
@@ -67,6 +54,13 @@ custom-linters:
 .PHONY: shellcheck
 shellcheck:
 	shellcheck --exclude SC2164,SC1091 admin/*.sh
+
+.PHONY: strictest
+strictest:
+	strictest lint \
+		--skip='**/_vendor/*' \
+		--skip='versioneer.py' \
+		--skip="**/_version.py"
 
 .PHONY: autoflake
 autoflake:
