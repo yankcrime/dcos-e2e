@@ -7,13 +7,11 @@ include lint.mk
 
 
 .PHONY: lint
-# We do not currently run pydocstyle as we have to ignore vendored items.
 lint: \
+	strictest \
     check-manifest \
     custom-linters \
     doc8 \
-    flake8 \
-    isort \
     linkcheck \
     mypy \
     pip-extra-reqs \
@@ -21,9 +19,7 @@ lint: \
     pylint \
     pyroma \
     shellcheck \
-    spelling \
-    vulture \
-    yapf
+    spelling
 
 # Fix some linting errors.
 .PHONY: fix-lint
