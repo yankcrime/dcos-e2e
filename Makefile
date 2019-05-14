@@ -9,7 +9,7 @@ include lint.mk
 .PHONY: lint
 lint: \
     strictest \
-    check-manifest \
+    custom-linters \
     doc8 \
     linkcheck \
     mypy \
