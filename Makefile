@@ -14,7 +14,6 @@ lint: \
     linkcheck \
     mypy \
     pylint \
-    pyroma \
     shellcheck \
     spelling
 

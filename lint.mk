@@ -21,17 +21,9 @@ mypy:
 doc8:
 	doc8 .
 
-.PHONY: pip-missing-reqs
-pip-missing-reqs:
-	pip-missing-reqs src/
-
 .PHONY: pylint
 pylint:
 	pylint *.py src/ tests/ admin/
-
-.PHONY: pyroma
-pyroma:
-	pyroma --min 10 .
 
 .PHONY: linkcheck
 linkcheck:
