@@ -10,12 +10,9 @@ include lint.mk
 lint: \
     strictest \
     check-manifest \
-    custom-linters \
     doc8 \
     linkcheck \
     mypy \
-    pip-extra-reqs \
-    pip-missing-reqs \
     pylint \
     pyroma \
     shellcheck \

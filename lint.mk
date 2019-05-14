@@ -21,10 +21,6 @@ mypy:
 doc8:
 	doc8 .
 
-.PHONY: pip-extra-reqs
-pip-extra-reqs:
-	pip-extra-reqs src/
-
 .PHONY: pip-missing-reqs
 pip-missing-reqs:
 	pip-missing-reqs src/
