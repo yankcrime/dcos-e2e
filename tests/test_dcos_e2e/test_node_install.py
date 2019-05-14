@@ -36,6 +36,7 @@ class TestAdvancedInstallationMethod:
                         dcos_config=cluster.base_config,
                         ip_detect_path=cluster_backend.ip_detect_path,
                         role=role,
+                        output=Output.LOG_AND_CAPTURE,
                     )
             cluster.wait_for_dcos_oss()
 
@@ -105,6 +106,7 @@ class TestCopyFiles:
                     (ip_detect_file, Path('/genconf/ip-detect')),
                 ],
                 role=Role.MASTER,
+                output=Output.LOG_AND_CAPTURE,
             )
             cluster.wait_for_dcos_oss()
             cat_result = master.run(
