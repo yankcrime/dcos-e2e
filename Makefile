@@ -8,7 +8,7 @@ include lint.mk
 
 .PHONY: lint
 lint: \
-	strictest \
+    strictest \
     check-manifest \
     custom-linters \
     doc8 \

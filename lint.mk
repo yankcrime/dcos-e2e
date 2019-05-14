@@ -60,7 +60,8 @@ strictest:
 	strictest lint \
 		--skip='**/_vendor/*' \
 		--skip='versioneer.py' \
-		--skip="**/_version.py"
+		--skip='**/_version.py' \
+		--src='src'
 
 .PHONY: autoflake
 autoflake:
