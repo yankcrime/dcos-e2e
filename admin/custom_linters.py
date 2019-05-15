@@ -3,7 +3,6 @@ Custom lint tests.
 """
 
 import subprocess
-import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import List  # noqa: F401
