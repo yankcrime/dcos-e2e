@@ -46,10 +46,11 @@ shellcheck:
 .PHONY: strictest
 strictest:
 	strictest lint \
-		--skip='**/_vendor/*' \
-		--skip='versioneer.py' \
-		--skip='**/_version.py' \
-		--src='src'
+		--skip '**/_vendor/*' \
+		--skip 'versioneer.py' \
+		--skip '**/_version.py' \
+		--src 'src' \
+		--non-src-package 'tests'
 
 .PHONY: autoflake
 autoflake:
