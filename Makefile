@@ -12,7 +12,6 @@ lint: \
     custom-linters \
     doc8 \
     linkcheck \
-    mypy \
     pylint \
     shellcheck \
     spelling

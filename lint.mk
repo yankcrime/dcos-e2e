@@ -13,10 +13,6 @@ fix-yapf:
 		--exclude='**/_version.py' \
 		.
 
-.PHONY: mypy
-mypy:
-	mypy *.py src/ tests/ admin/
-
 .PHONY: doc8
 doc8:
 	doc8 .
@@ -50,6 +46,7 @@ strictest:
 		--skip 'versioneer.py' \
 		--skip '**/_version.py' \
 		--src 'src' \
+		--non-src-package 'admin' \
 		--non-src-package 'tests'
 
 .PHONY: autoflake
